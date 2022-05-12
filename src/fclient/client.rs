@@ -16,7 +16,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut client = FrontendClient::connect("http://[::1]:50051").await.unwrap();
     
     let req = tonic::Request::new(StartRequest {
-        spec: Some(HaystackSpec{target: 203102}),
+        spec: Some(HaystackSpec{target: 2031002}),
         time_limit_ms: 0,
     });
     

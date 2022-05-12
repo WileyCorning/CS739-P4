@@ -1,2 +1,2 @@
 
-tonic::include_proto!("sah_rpc");
+tonic::include_proto!("haystack_rpc");

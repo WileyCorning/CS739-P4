@@ -21,7 +21,7 @@ struct ConsensusBuilder<TOutput> {
     incremental_map: HashMap<BatchId,HashMap<WorkerId,TOutput>>,
 }
 
-impl<TOutput:Hash+Eq+Clone> ConsensusBuilder<TOutput> {
+impl<TOutput:PartialEq+Clone> ConsensusBuilder<TOutput> {
     // Add a new single-worker result. Returns true iff we have enough results in this batch to check consensus.
     fn register(&mut self, batch_id: BatchId, worker_id: WorkerId, output:TOutput) -> bool {
         let group = self.incremental_map.entry(batch_id).or_insert(HashMap::new());
@@ -43,11 +43,25 @@ impl<TOutput:Hash+Eq+Clone> ConsensusBuilder<TOutput> {
         if current_size <= self.fault_tol {
             Ok(None)
         } else {
-            let counted = group.values().collect::<Counter<_>>();
-            let (best, freq) = counted.most_common().into_iter().nth(0).unwrap();
+            
+            let mut counts:Vec<usize> = Vec::new();
+            let mut values:Vec<TOutput> = Vec::new();
+            for m in group.values().cloned() {
+                if let Some(idx) = values.iter().position(|v|m==*v) {
+                    counts[idx] +=1;
+                } else {
+                    counts.push(1);
+                    values.push(m);
+                }
+            }
+            
+            let (idx,&freq) = counts.iter().enumerate().max_by(|(_,k0),(_,k1)|(k0.cmp(k1))).unwrap();
+            
+            // let counted = group.values().collect::<Counter<_>>();
+            // let (best, freq) = counted.most_common().into_iter().nth(0).unwrap();
             
             if freq > self.fault_tol {
-                Ok(Some(best.clone()))
+                Ok(Some(values[idx].clone()))
             } else if current_size >= quorum_size {
                 Err(anyhow!("Received 2F+1 outputs with no majority consensus (have {}, F={}, best is {})",current_size, self.fault_tol,freq))
             } else {
@@ -132,11 +146,20 @@ impl CommitMask {
 }
 ////////////////////////
 pub trait ProblemDomain {
+    // Type of a conclusion to the problem, if found
     type TSolution;
-    type TBatch;
-    type TOutput:Hash+Eq+Clone;
-    type TGen:Gen<Self::TBatch>;
-    type TSpecification:Spec<Self::TOutput,Self::TSolution>+Clone;
+    
+    // Type of a chunk of work that will be sent to a volunteer
+    type TBatchInput;
+    
+    // Type returned by volunteers
+    type TBatchOutput:PartialEq+Clone;
+    
+    // Type of a stateful generator that can produce batches
+    type TGen:Gen<Self::TBatchInput>;
+    
+    // Type of the original specification sent by the client
+    type TSpecification:Spec<Self::TBatchOutput,Self::TSolution>+Clone;
     
     fn MakeGen(spec:Self::TSpecification) -> Self::TGen;
     
@@ -158,11 +181,11 @@ pub struct ProblemState<T:ProblemDomain> {
     request: ProblemRequest<T>,
     gen: T::TGen,
     commit_mask: CommitMask,
-    consensus_builder: ConsensusBuilder<T::TOutput>,
+    consensus_builder: ConsensusBuilder<T::TBatchOutput>,
 }
 
 impl<T:ProblemDomain> ProblemState<T> {
-    pub fn put_value(&mut self, batch_id:BatchId,worker_id:WorkerId,value:T::TOutput) ->Option<Result<T::TSolution>> {
+    pub fn put_value(&mut self, batch_id:BatchId,worker_id:WorkerId,value:T::TBatchOutput) ->Option<Result<T::TSolution>> {
         
         
         if !self.consensus_builder.register(batch_id, worker_id, value) {
@@ -206,7 +229,7 @@ pub trait Gen<TBatch> {
 impl<T:ProblemDomain> CoreState<T> {
     pub fn new() -> CoreState<T> { CoreState{top_id: 0, active_problems:HashMap::new()} }
     
-    pub fn try_next_where<F>(&self,filter:F) -> Option<(ProblemId,BatchId,T::TBatch)> where F:Fn((ProblemId,BatchId)) -> bool {
+    pub fn try_next_where<F>(&self,filter:F) -> Option<(ProblemId,BatchId,T::TBatchInput)> where F:Fn((ProblemId,BatchId)) -> bool {
         
         for (problem_id, problem_data) in self.active_problems.iter() {
             
@@ -278,7 +301,7 @@ pub async fn aggregation_loop <T:ProblemDomain> (
     core_state: Arc<RwLock<CoreState<T>>>,
     fault_tol: usize,
     problem_source: Receiver<ProblemRequest<T>>, // Carries requests from frontend clients
-    result_bus_receiver: Receiver<(ProblemId,BatchId,WorkerId,T::TOutput)>, // Carries results from workers
+    result_bus_receiver: Receiver<(ProblemId,BatchId,WorkerId,T::TBatchOutput)>, // Carries results from workers
     token: CancellationToken
 ) {
     let sleep_period = Duration::from_millis(100);

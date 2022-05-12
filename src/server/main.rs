@@ -7,7 +7,7 @@ use std::sync::Arc;
 use crossbeam_channel::{bounded, Sender};
 use crossbeam_channel::{unbounded, Receiver};
 use futures::{FutureExt, StreamExt};
-use sah_lib::naive::enumeration::Haystack;
+use sah_lib::naive::haystack::Haystack;
 use tokio::sync::mpsc;
 use tokio::sync::RwLock;
 use tokio::time::{sleep,Duration};
@@ -26,10 +26,10 @@ use sah_lib::comms::{frontend_server::*, volunteering_server::*, *};
 
 use tonic::{transport::Server, Request, Response, Status};
 
-use sah_lib::naive::enumeration::HaystackWorker;
+use sah_lib::naive::haystack::HaystackWorker;
 
 pub struct VolunteeringState<T: ProblemDomain> {
-    result_bus_sender: Sender<(ProblemId, BatchId, WorkerId, T::TOutput)>,
+    result_bus_sender: Sender<(ProblemId, BatchId, WorkerId, T::TBatchOutput)>,
     top_worker_id: Arc<RwLock<WorkerId>>,
     core_state: Arc<RwLock<CoreState<T>>>,
     token: CancellationToken,
@@ -114,20 +114,8 @@ impl Frontend for FrontendState {
         println!("Did send problemrequest");
         
         
-        // let out = loop {
-        //     if let Ok(a) = tx.try_recv() {
-        //         println!("main got one");
-                
-        //         break a
-        //     }
-        //     println!("main sleepin");
-            
-        //     sleep(Duration::from_millis(1000)).await
-        // };
         
         if let Some(out) = tx.recv().await {
-            // blocking wait
-
             Ok(Response::new(OneShotResponse {
                 elapsed_realtime_ms: 0,
                 outcome: Some(match out {

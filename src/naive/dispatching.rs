@@ -105,7 +105,8 @@ pub async fn worker_loop<T:ProblemDomain, TWorker:Worker<T>>(
     println!("Worker {} starting loop",worker_id);
     
     let max_pending=2;
-    while !token.is_cancelled() {
+    
+    'outer: while !token.is_cancelled() {
         // Flush any inbound messages
         loop {
             if let Ok(oh) = worker.try_flush_one() {
@@ -115,7 +116,7 @@ pub async fn worker_loop<T:ProblemDomain, TWorker:Worker<T>>(
                     break;
                 }
             } else {
-                return;
+                break 'outer;
             }
         }
         
@@ -179,22 +180,20 @@ pub async fn worker_loop<T:ProblemDomain, TWorker:Worker<T>>(
         
         // Dispatch the RPC
         if let Err(msg) = worker.send_batch(problem_id, batch_id, batch).await {
-            return; // todo err handling
-            
+            break 'outer;// todo err handling
         }
-            // On RPC success, publish our result
-        //     Ok(value) => result_bus_sender.send((problem_id,batch_id,worker_id,value)),
-            
-        //     // On RPC failure, retire this worker
-        //     Err(code) => {
-        //         // Decrement attempt counter for this block
-        //         delegation_core.write().await.uncount_attempt(problem_id,batch_id);
-                
-        //         // Quit the loop
-        //         return;
-        //     }
-        // };
     }
+    println!("Worker stub cleaning up");
+    
+    if pending.len()>0 {
+        let mut aa = delegation_core.write().await;
+        for (cc,qq) in pending.into_iter() {
+            println!("cleanup {}.{}",cc,qq);
+            
+            aa.uncount_attempt(cc,qq);
+        }
+    }
+    
 }
 
 
@@ -212,7 +211,7 @@ pub trait Worker<T:ProblemDomain> {
     
     fn get_id(&self) -> &WorkerId;
     async fn send_setup(&mut self, problem_id: ProblemId, spec:T::TSpecification) -> Result<(), Self::SendError>;
-    async fn send_batch(&mut self, problem_id: ProblemId, batch_id: BatchId, batch: T::TBatch) -> Result<(),Self::SendError>;
+    async fn send_batch(&mut self, problem_id: ProblemId, batch_id: BatchId, batch: T::TBatchInput) -> Result<(),Self::SendError>;
     async fn send_teardown(&mut self, problem_id: ProblemId) -> Result<(),Self::SendError>;
     fn try_flush_one(&mut self) -> Result<Option<(ProblemId,BatchId)>>;
     

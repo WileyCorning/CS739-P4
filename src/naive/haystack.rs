@@ -30,9 +30,9 @@ pub struct Haystack {}
 impl ProblemDomain for Haystack {
     type TSolution = TermIndex;
 
-    type TBatch = HaystackBatch;
+    type TBatchInput = HaystackBatch;
 
-    type TOutput = MyWorkerOutput;
+    type TBatchOutput = MyWorkerOutput;
 
     type TGen = HaystackGen;
 
@@ -187,50 +187,3 @@ pub struct HaystackBatch {
     range_start : u64,
     range_length : u64,
 }
-
-// struct MyTransformer{
-
-// }
-// impl SolutionFilter<MyWorkerOutput,Result<TermIndex>> for MyTransformer{
-//     fn check(&self, incr: MyWorkerOutput) -> Option<Result<TermIndex>> {
-//         match incr.inner {
-//             BlockSingleResult::FoundSolution(solution) => Some(Ok(solution)),
-//             BlockSingleResult::Searched => None,
-//             BlockSingleResult::Err(msg) => Some(Err(anyhow!("inner issue {}", msg))), //todo reporting
-//         }
-//     }
-// }
-
-// struct MyWorker {
-//     id: WorkerId,
-//     conn: DelegationClient<Channel>,
-// }
-
-// struct ProblemCfg {
-//     problem_id: u32,
-//     config: Specification,
-// }
-
-// pub async fn run()  {
-    
-    // await sloop(core_state, fault_tol, problem_source, result_bus_receiver, token);
-    // let cant = CancellationToken::new();
-    // let generator = MyGenerator{problem_id,spec,stride: 10000};
-
-    // let worker_group: HashMap<WorkerId, Arc<RwLock<MyWorker>>> = HashMap::new();
-
-    // let a_worker_group = Arc::new(RwLock::new(worker_group));
-    // let fault_tol = 2;
-
-    // let solution_filter = MyTransformer{};
-
-    // let mut is_stop = Arc::new(false);
-
-    // let (outputs_s,outputs_r) = unbounded();
-
-    // let commit_mask = Arc::new(CommitMask::new());
-
-    // let dispatcher = tokio::spawn(    run_dispatch_loop(a_worker_group, outputs_s, commit_mask, cant.clone(), generator));
-    // let ret = outer_loop(fault_tol, &solution_filter, &outputs_r, cant.clone()).await;
-
-// }
