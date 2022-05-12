@@ -1,0 +1,170 @@
+syntax="proto3";
+package sah_rpc;
+
+// /* Within-cluster messages */
+// service Volunteering {
+//     rpc Volunteer(Empty) returns (Empty);
+// }
+
+
+service Volunteering {
+    rpc Bidir(stream WorkerToLeader) returns (stream LeaderToWorker);
+}
+
+service Delegation {
+    // rpc Delegate(stream LeaderToWorker) returns (stream WorkerToLeader);
+    rpc Delegate(LeaderToWorker) returns (WorkerToLeader);
+}
+
+message Empty { }
+
+// message LeaderToWorker {
+//     uint32 problem_id = 1;
+//     oneof payload {
+//         Specification config = 2;
+//         TaskBlock task = 3;
+//         uint32 cancel_block = 4;
+//         Empty clear_problem = 5;
+//     }
+// }
+
+message LeaderToWorker {
+    uint32 seq = 1;
+    oneof payload {
+        ProblemSetup setup = 2;
+        BatchRequest batch = 3;
+        ProblemTeardown teardown = 4;
+    }
+}
+
+message ProblemSetup {
+    uint32 problem_id = 1;
+    HaystackSpec spec = 2;
+}
+message ProblemTeardown {
+    uint32 problem_id = 1;
+}
+
+message BatchRequest {
+    uint32 problem_id = 1;
+    uint32 batch_id = 2;
+    uint64 range_start = 3;
+    uint64 range_length = 4;
+}
+
+message WorkerToLeader {
+    uint32 seq = 1;
+    optional WorkerReport report = 2;
+}
+    
+message WorkerReport {
+    uint32 problem_id = 1;
+    uint32 block_id = 2;
+    uint64 elapsed_ms = 3;
+    oneof status {
+        Empty ongoing = 10; // new_distinct_terms
+        Empty ran_to_end = 11; // new_distinct_terms
+        HaystackSolution found_solution = 12;
+        string error = 13;
+    }
+}
+
+message HaystackSolution {
+    uint64 value = 1;
+}
+
+message HaystackSpec {
+    uint64 target = 1;
+}
+
+/* Client messages */
+service Frontend {
+    rpc OneShotSolve(StartRequest) returns (OneShotResponse);
+    // rpc SolveProblem(StartRequest) returns (StartResponse);
+    // rpc ProgressUpdate(ControlMessage) returns (stream SynthProgress);
+}
+
+
+message StartRequest {
+    HaystackSpec spec = 1;
+    uint64 time_limit_ms = 2;
+}
+
+message OneShotResponse {
+    uint64 elapsed_realtime_ms = 1;
+    oneof outcome { 
+        HaystackSolution solution = 10;
+        string error = 11;
+    }
+}
+
+// message StartResponse {
+//     uint32 problem_id = 1;
+// }
+
+// message ControlMessage {
+//     uint32 problem_id = 1;
+//     oneof payload {
+//         Empty stop = 2;
+//         uint64 update_period_ms = 3;
+//     }
+// }
+
+// message SynthProgress {
+//     uint64 n_checked = 1;
+//     // uint64 n_distinct=2;
+//     uint64 elapsed_realtime_ms = 3; 
+//     uint64 elapsed_worktime_ms = 4; // Sum of time spent by all workers
+//     uint64 fastest_worktime_ms = 5; // Sum of the fastest worker's time for each block
+    
+//     enum HaltReason {
+//         CANCELED = 0;      // Cancellation requested by client
+//         END_OF_SEARCH = 1; // All possible terms have tested without any solution found
+//         TIME_LIMIT = 2;    // The maximum realtime duration has been exceeded
+//     }
+    
+//     oneof status {
+//         Empty ongoing = 6;
+//         Ast success = 7;
+//         HaltReason halted = 8;
+//         string error = 9;
+//     }
+// }
+
+/* Inner data types */
+// message Specification {
+//     repeated Nonterminal grammar = 1;
+//     repeated Example constraint = 2;
+// }
+
+// message Specification {
+//     uint64 goal = 1;
+// }
+
+// message Nonterminal {
+//     repeated Production prod = 1;
+// }
+// message Production {
+//     uint32 prod_id = 1;
+//     repeated uint32 child_nt = 2;
+// }
+// message Example {
+//     bytes input = 1;
+//     bytes output = 2;
+// }
+
+// message Ast {
+//     // repeated uint32 nodes = 1;
+//     uint64 term = 1;
+// }
+// // message TermRange {
+// //     Ast start = 1;
+// //     Ast end = 2;
+// // }
+
+// message TaskBlock {
+//     uint32 block_id = 1;
+//     // TermRange range = 2;
+//     uint64 start = 2;
+//     uint64 length = 3;
+// }

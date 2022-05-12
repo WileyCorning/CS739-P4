@@ -1,0 +1,15 @@
+syntax = "proto3";
+package sayhi_rpc;
+service Handshake {
+    rpc SayHello (HelloRequest) returns (HelloResponse);
+}
+service StreamingHandshake {
+    rpc Bidirectional(stream HelloRequest) returns (stream HelloResponse);
+}
+
+message HelloRequest {
+    string payload=1;
+}
+message HelloResponse {
+    string payload=1;
+}
