@@ -59,7 +59,12 @@ message HaystackSolution {
 }
 
 message HaystackSpec {
-    uint64 target = 1;
+    repeated Example examples = 1;
+}
+
+message Example {
+    repeated int32 input = 1;
+    repeated int32 output = 2;
 }
 
 /* Client messages */

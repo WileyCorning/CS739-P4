@@ -98,24 +98,19 @@ impl Frontend for FrontendState {
 
         let (rx, mut tx) = mpsc::channel(2);
         
-        println!("Ctor ProblemRequest");
-        
         let pr = ProblemRequest {
             spec: req
                 .spec
                 .ok_or(Status::invalid_argument("No spec provided"))?,
-            completion_callback: rx,
+            completion_callback: rx.clone(),
             token: problem_token,
         };
         
-        println!("Sending problemrequest");
 
         self.proc.send(pr).expect(" send err ");
-        println!("Did send problemrequest");
-        
-        
         
         if let Some(out) = tx.recv().await {
+            println!("Replying to client with {:?}",out);
             Ok(Response::new(OneShotResponse {
                 elapsed_realtime_ms: 0,
                 outcome: Some(match out {

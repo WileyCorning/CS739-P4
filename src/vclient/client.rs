@@ -1,6 +1,7 @@
 extern crate sah_lib;
 use sah_lib::comms::{*,volunteering_client::*};
 use sah_lib::naive::aggregation::{ProblemId,BatchId};
+use sah_lib::naive::encoding::outer_eval;
 
 use std::{pin::Pin, collections::HashMap};
 
@@ -86,11 +87,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn eval(spec: &HaystackSpec, range_start: u64, range_length: u64) -> Option<HaystackSolution> {
-    sleep(Duration::from_millis(100)).await;
-    let t = spec.target;
-    if(range_start <= t && t < range_start + range_length) {
-        Some(HaystackSolution{value:t})
-    } else {
-        None
+    'outer: for term in range_start..range_start+range_length {
+        for example in spec.examples.iter() {
+            if let Some(value) = outer_eval(term,example.input[0],example.input[1]) {
+                if(value != example.output[0]) {
+                    // mismatch
+                    continue 'outer;
+                }
+            } else {
+                // invalid term
+                continue 'outer;
+            }
+        }
+        return Some(HaystackSolution{value:term});
     }
+    None
 }

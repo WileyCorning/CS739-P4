@@ -195,6 +195,7 @@ impl<T:ProblemDomain> ProblemState<T> {
         match self.consensus_builder.check_consensus(batch_id) {
             Ok(maybe_consensus) => match maybe_consensus {
                 Some(consensus) => {
+                    println!("Commit _.{batch_id}");
                     self.commit_mask.register_commit(batch_id.try_into().unwrap());
                     self.request.spec.check_completion(consensus)
                 }
@@ -242,7 +243,6 @@ impl<T:ProblemDomain> CoreState<T> {
             let batch_id = {
                 let mut t = commit_head.try_into().unwrap();
                 loop {
-                    println!("t_n_w check {}.{}",problem_id,t);
                     
                     if commit_mask.is_available(t) && filter((*problem_id, t.try_into().unwrap())) {
                         break t;
@@ -253,7 +253,6 @@ impl<T:ProblemDomain> CoreState<T> {
             .try_into()
             .unwrap();
             
-            println!("t_n_w found {}.{}",problem_id,batch_id);
             
             if let Some(batch) = gen.try_make(batch_id) {
                 return Some((*problem_id,batch_id,batch));
@@ -263,6 +262,7 @@ impl<T:ProblemDomain> CoreState<T> {
     }
     
     pub fn forget(&mut self,problem_id: ProblemId) {
+        println!("Cleaning up problem ${problem_id}");
         self.active_problems.remove(&problem_id);
     }
     
@@ -305,23 +305,14 @@ pub async fn aggregation_loop <T:ProblemDomain> (
     token: CancellationToken
 ) {
     let sleep_period = Duration::from_millis(100);
-    println!("agg loop start");
     
     while !token.is_cancelled() {
         // Handle any new problem
-        println!("\tecievhe");
-        
         if let Ok(next_problem) = problem_source.try_recv() {
-            println!("\tlock it lock it");
-            let mut lock_it = core_state.write().await;
-            println!("\tunlock it");
-            
-            let problem_id = lock_it.add_problem(ProblemState::new(next_problem,fault_tol));
-            println!("\tstarted work on problem #{}",problem_id);
+            let problem_id = core_state.write().await.add_problem(ProblemState::new(next_problem,fault_tol));
+            println!("\tStarted work on problem #{}",problem_id);
             continue;
         }
-        
-        println!("no new problem");
         
         // Handle any new worker output
         if let Ok(next_result) = result_bus_receiver.try_recv() {
@@ -335,21 +326,17 @@ pub async fn aggregation_loop <T:ProblemDomain> (
                 
                 // If this yields a conclusion, complete the relevant request
                 if let Some(conclusion) = problem_state.put_value(batch_id,worker_id,value) {
-                    problem_state.request.completion_callback.send(conclusion);
+                    problem_state.request.completion_callback.send(conclusion).await;
                     access.forget(problem_id);
                 };
             }
             
             continue;
         }
-        println!("before sleep");
-        
         // If there was nothing to do, sleep for a moment
         sleep(sleep_period).await;
-        println!("after sleep");
-        
     }
-    println!("agg loop exit");
+    println!("Aggregation loop exit");
     
 }
 // ///////////////////////

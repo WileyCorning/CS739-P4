@@ -149,7 +149,7 @@ pub async fn worker_loop<T:ProblemDomain, TWorker:Worker<T>>(
             continue;
         };
         
-        println!("\t\tWorker {} starting on {}.{}",worker_id,problem_id,batch_id);
+        println!("\t\tWorker {} starting on {}.{} (pend {})",worker_id,problem_id,batch_id,pending.len());
         
         // Register that this worker is attempting this task (this is why we need the write lock)
         src.count_attempt(problem_id,batch_id);
@@ -183,12 +183,10 @@ pub async fn worker_loop<T:ProblemDomain, TWorker:Worker<T>>(
             break 'outer;// todo err handling
         }
     }
-    println!("Worker stub cleaning up");
     
     if pending.len()>0 {
         let mut aa = delegation_core.write().await;
         for (cc,qq) in pending.into_iter() {
-            println!("cleanup {}.{}",cc,qq);
             
             aa.uncount_attempt(cc,qq);
         }
