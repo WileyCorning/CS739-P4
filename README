@@ -1,0 +1,5 @@
+The project consists of three Rust binaries with a set of shared library code.
+
+To demonstrate the code on your local machine, run `cargo run --bin [server|volunteer|client]`; you will need to run all three simultaneously to observe its behavior.
+
+At time of writing, I'm still working on my evaluation and testing, as well as the report document (Remzi suggested I could take a little extra time for this). If AFS is locked before I finish the report, I will submit it through Canvas. Apologies for the dlay on this. My slides cover the main ideas implemented in this system.

@@ -1,2 +1,2 @@
 pub mod comms;
-pub mod naive;
+pub mod shared;

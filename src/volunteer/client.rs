@@ -1,9 +1,9 @@
 extern crate sah_lib;
 
 
-use sah_lib::naive::int_expr_grammar::*;
+use sah_lib::shared::int_expr_grammar::*;
 use sah_lib::comms::{volunteering_client::*, *};
-use sah_lib::naive::aggregation::ProblemId;
+use sah_lib::shared::aggregation::ProblemId;
 
 use std::collections::HashMap;
 

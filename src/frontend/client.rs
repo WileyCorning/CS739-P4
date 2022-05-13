@@ -2,7 +2,7 @@ extern crate sah_lib;
 use sah_lib::comms::one_shot_response::Outcome;
 use sah_lib::comms::{frontend_client::*, *};
 
-use sah_lib::naive::int_expr_grammar::pretty_print;
+use sah_lib::shared::int_expr_grammar::pretty_print;
 
 use tonic::transport::Channel;
 

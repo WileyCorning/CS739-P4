@@ -6,7 +6,7 @@ use std::sync::Arc;
 use crossbeam_channel::unbounded;
 use crossbeam_channel::Sender;
 
-use sah_lib::naive::haystack::Haystack;
+use sah_lib::shared::haystack::Haystack;
 use tokio::sync::mpsc;
 use tokio::sync::RwLock;
 
@@ -14,8 +14,8 @@ use tokio_util::sync::CancellationToken;
 
 use futures_core::Stream;
 
-use sah_lib::naive::aggregation::*;
-use sah_lib::naive::dispatching::*;
+use sah_lib::shared::aggregation::*;
+use sah_lib::shared::dispatching::*;
 
 use anyhow::Result;
 
@@ -23,7 +23,7 @@ use sah_lib::comms::{frontend_server::*, volunteering_server::*, *};
 
 use tonic::{transport::Server, Request, Response, Status};
 
-use sah_lib::naive::haystack::HaystackWorker;
+use sah_lib::shared::haystack::HaystackWorker;
 
 pub struct VolunteeringState<T: ProblemDomain> {
     result_bus_sender: Sender<(ProblemId, BatchId, WorkerId, T::TBatchOutput)>,

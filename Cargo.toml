@@ -7,31 +7,19 @@ edition = "2021"
 name="sah_lib"
 path="src/lib.rs"
 
-[[bin]]
-name="hello-server"
-path="src/hello/server.rs"
-[[bin]]
-name="hello-client"
-path="src/hello/client.rs"
 
-[[bin]]
-name="hello-stream-server"
-path="src/hello-stream/server.rs"
-[[bin]]
-name="hello-stream-client"
-path="src/hello-stream/client.rs"
 
-[[bin]]
-name="volunteer-client"
-path="src/vclient/client.rs"
-
-[[bin]]
-name="frontend-client"
-path="src/fclient/client.rs"
 [[bin]]
 name="server"
-path="src/server/main.rs"
+path="src/leader/server.rs"
 
+[[bin]]
+name="volunteer"
+path="src/volunteer/client.rs"
+
+[[bin]]
+name="client"
+path="src/frontend/client.rs"
 
 [dependencies]
 anyhow = "1.0.57"

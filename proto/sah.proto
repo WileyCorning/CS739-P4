@@ -1,12 +1,6 @@
 syntax="proto3";
 package haystack_rpc;
 
-// /* Within-cluster messages */
-// service Volunteering {
-//     rpc Volunteer(Empty) returns (Empty);
-// }
-
-
 service Volunteering {
     rpc Bidir(stream WorkerToLeader) returns (stream LeaderToWorker);
 }

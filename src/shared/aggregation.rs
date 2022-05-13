@@ -79,12 +79,6 @@ impl<TOutput:PartialEq+Clone> ConsensusBuilder<TOutput> {
     }
 }
 
-// // Helper that attempts to convert a given block result into an overall result
-// pub trait SolutionFilter<TOutput,TFinal> {
-//     fn check(&self, incr: TOutput) -> Option<TFinal>;
-
-// }
-
 // Tracks which blocks have reached consensus
 pub struct CommitMask {
     pub commit_head: usize,
@@ -141,7 +135,7 @@ impl CommitMask {
         CommitMask {commit_head:0,max_attempts,commits:Vec::new(), attempts:Vec::new()}
     }
 }
-////////////////////////
+
 pub trait ProblemDomain {
     // Type of a conclusion to the problem, if found
     type TSolution;
@@ -159,7 +153,10 @@ pub trait ProblemDomain {
     type TSpecification:Spec<Self::TBatchOutput,Self::TSolution>+Clone;
     
     fn make_gen(spec:Self::TSpecification) -> Self::TGen;
-    
+}
+
+pub trait Gen<TBatch> {
+    fn try_make(&self, batch_id:BatchId) -> Option<TBatch>;
 }
 
 
@@ -221,11 +218,6 @@ pub struct CoreState<T:ProblemDomain> {
     top_id: ProblemId,
     active_problems: HashMap<ProblemId,ProblemState<T>>,
 }
-
-pub trait Gen<TBatch> {
-    fn try_make(&self, batch_id:BatchId) -> Option<TBatch>;
-}
-
 
 impl<T:ProblemDomain> CoreState<T> {
     pub fn new() -> CoreState<T> { CoreState{top_id: 0, active_problems:HashMap::new()} }
