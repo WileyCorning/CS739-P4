@@ -1,12 +1,13 @@
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::hash::Hash;
+use std::collections::{HashMap};
+
 use std::sync::Arc;
 
-use crossbeam_channel::{bounded, unbounded, Receiver, RecvError, Sender};
+use crossbeam_channel::{Receiver};
+
 use anyhow::{Result,anyhow};
-use counter::Counter;
+
 use tokio::sync::{RwLock, mpsc};
-use tokio::time::{Duration,Instant, sleep};
+use tokio::time::{Duration, sleep};
 
 use tokio_util::sync::CancellationToken;
 
@@ -24,12 +25,12 @@ struct ConsensusBuilder<TOutput> {
 impl<TOutput:PartialEq+Clone> ConsensusBuilder<TOutput> {
     // Add a new single-worker result. Returns true iff we have enough results in this batch to check consensus.
     fn register(&mut self, batch_id: BatchId, worker_id: WorkerId, output:TOutput) -> bool {
-        let group = self.incremental_map.entry(batch_id).or_insert(HashMap::new());
+        let group = self.incremental_map.entry(batch_id).or_insert_with(HashMap::new);
         group.insert(worker_id,output);
         group.len() > self.fault_tol
     }
     
-    // Test
+    
     // This will throw iff we have more than 2F+1 results with no consensus.
     fn check_consensus(&self, batch_id: BatchId) -> Result<Option<TOutput>> {
         let group = match self.incremental_map.get(&batch_id) {
@@ -68,10 +69,6 @@ impl<TOutput:PartialEq+Clone> ConsensusBuilder<TOutput> {
                 Ok(None)
             }
         }
-    }
-    
-    fn clear(&mut self, batch_id: BatchId) {
-        self.incremental_map.remove(&batch_id);
     }
     
     fn new(fault_tol: usize) -> Self {
@@ -161,10 +158,9 @@ pub trait ProblemDomain {
     // Type of the original specification sent by the client
     type TSpecification:Spec<Self::TBatchOutput,Self::TSolution>+Clone;
     
-    fn MakeGen(spec:Self::TSpecification) -> Self::TGen;
+    fn make_gen(spec:Self::TSpecification) -> Self::TGen;
     
 }
-
 
 
 pub trait Spec<TValue,TSolution> {
@@ -186,7 +182,11 @@ pub struct ProblemState<T:ProblemDomain> {
 
 impl<T:ProblemDomain> ProblemState<T> {
     pub fn put_value(&mut self, batch_id:BatchId,worker_id:WorkerId,value:T::TBatchOutput) ->Option<Result<T::TSolution>> {
+        let t = batch_id.try_into().unwrap();
         
+        if self.commit_mask.is_committed(t) {
+            return None;
+        }
         
         if !self.consensus_builder.register(batch_id, worker_id, value) {
             return None;
@@ -196,7 +196,7 @@ impl<T:ProblemDomain> ProblemState<T> {
             Ok(maybe_consensus) => match maybe_consensus {
                 Some(consensus) => {
                     println!("Commit _.{batch_id}");
-                    self.commit_mask.register_commit(batch_id.try_into().unwrap());
+                    self.commit_mask.register_commit(t);
                     self.request.spec.check_completion(consensus)
                 }
                 None => None,
@@ -207,10 +207,10 @@ impl<T:ProblemDomain> ProblemState<T> {
     
     pub fn new(req: ProblemRequest<T>, fault_tol:usize) -> ProblemState<T> {
         let n_attempts = 3*fault_tol+1;
-        let gen = T::MakeGen(req.spec.clone());
+        let gen = T::make_gen(req.spec.clone());
         ProblemState {
             request:req,
-            gen: gen,
+            gen,
             commit_mask:CommitMask::new(n_attempts),
             consensus_builder: ConsensusBuilder::new(fault_tol)
         }
@@ -241,7 +241,7 @@ impl<T:ProblemDomain> CoreState<T> {
             
             // Find the next batch that this worker can work on
             let batch_id = {
-                let mut t = commit_head.try_into().unwrap();
+                let mut t = commit_head;
                 loop {
                     
                     if commit_mask.is_available(t) && filter((*problem_id, t.try_into().unwrap())) {
@@ -295,6 +295,12 @@ impl<T:ProblemDomain> CoreState<T> {
     // }
 }
 
+impl<T: ProblemDomain> Default for CoreState<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 
 
 pub async fn aggregation_loop <T:ProblemDomain> (
@@ -326,7 +332,9 @@ pub async fn aggregation_loop <T:ProblemDomain> (
                 
                 // If this yields a conclusion, complete the relevant request
                 if let Some(conclusion) = problem_state.put_value(batch_id,worker_id,value) {
-                    problem_state.request.completion_callback.send(conclusion).await;
+                    if (problem_state.request.completion_callback.send(conclusion).await).is_err() {
+                        println!("Unable to send completion for problem {problem_id}");
+                    }
                     access.forget(problem_id);
                 };
             }
@@ -339,60 +347,4 @@ pub async fn aggregation_loop <T:ProblemDomain> (
     println!("Aggregation loop exit");
     
 }
-// ///////////////////////
-// pub async fn outer_loop<TOutput:Hash+Eq+Clone, TFinal>(
-//     fault_tol: usize,
-//     solution_filter: &dyn SolutionFilter<TOutput, TFinal>,
-//     outputs_r: &Receiver<(BatchId,WorkerId,TOutput)>,
-//     token: CancellationToken,
-// ) -> Result<TFinal> {
-//     // Construct intermediate data structures
-//     let mut output_log = ConsensusBuilder::new(fault_tol);
-//     let mut commit_mask = CommitMask::new();
-    
-//     loop {
-//         // Take the next batch consensus result, or else break due to cancellation
-//         let (batch_id, next) = aggregate_until_next(&mut output_log, &commit_mask, outputs_r,token.clone())?;
-        
-        
-//         // Return a final result, if this block consensus contains one
-//         if let Some(endpoint) = solution_filter.check(next) {
-//             return Ok(endpoint);
-//         }
-        
-//         // Otherwise mark this block as committed and discard partial results
-//         commit_mask.register_commit(batch_id.try_into().unwrap());
-//         output_log.clear(batch_id);
-//     }
-// }
 
-// // Receive worker reports until we acquire the next consensus value.
-// fn aggregate_until_next<TOutput:Hash+Eq+Clone> (
-//     inputs: &mut ConsensusBuilder<TOutput>,
-//     commit_mask: &CommitMask,
-//     outputs_r: &Receiver<(BatchId,WorkerId,TOutput)>,
-//     token: CancellationToken,
-//     //...
-// ) -> Result<(BatchId,TOutput)> {
-//     loop {
-//         // Retrieve the next result, or else exit due to cancellation request
-//         let (batch_id,worker_id,next) = loop {
-//             if token.is_cancelled() { return Err(anyhow!("Ran to end"));}
-//             if let Ok(val) = outputs_r.recv_timeout(Duration::from_millis(10)) {
-//                 break val
-//             }
-//         };
-        
-//         // If this is a "stale" result - i.e., consensus has been reached since it was dispatched - discard it
-//         if commit_mask.is_committed(batch_id.try_into().unwrap()) { continue; }
-        
-//         // Register the result, see whether we have enough for consensus
-//         if inputs.register(batch_id,worker_id,next)  {    
-//             // If there is a consensus, return it
-//             // If this method throws, we have hit a showstopping error
-//             if let Some(output) = inputs.check_consensus(batch_id)? {
-//                 return Ok((batch_id,output));
-//             }
-//         }
-//     }
-// }

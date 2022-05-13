@@ -1,27 +1,24 @@
 extern crate sah_lib;
 
-use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use crossbeam_channel::{bounded, Sender};
-use crossbeam_channel::{unbounded, Receiver};
-use futures::{FutureExt, StreamExt};
+use crossbeam_channel::unbounded;
+use crossbeam_channel::Sender;
+
 use sah_lib::naive::haystack::Haystack;
 use tokio::sync::mpsc;
 use tokio::sync::RwLock;
-use tokio::time::{sleep,Duration};
-use tokio_util::sync::CancellationToken;
-use tonic::transport::Channel;
 
-use futures::future::SelectAll;
+use tokio_util::sync::CancellationToken;
+
 use futures_core::Stream;
 
 use sah_lib::naive::aggregation::*;
 use sah_lib::naive::dispatching::*;
 
-use anyhow::{anyhow, Result};
-use async_trait::async_trait;
+use anyhow::Result;
+
 use sah_lib::comms::{frontend_server::*, volunteering_server::*, *};
 
 use tonic::{transport::Server, Request, Response, Status};
@@ -54,7 +51,7 @@ impl Volunteering for VolunteeringState<Haystack> {
             request.remote_addr()
         );
 
-        let mut in_stream = request.into_inner();
+        let in_stream = request.into_inner();
 
         let (tx, rx) = mpsc::channel(128);
 
@@ -97,25 +94,24 @@ impl Frontend for FrontendState {
         let problem_token = CancellationToken::new();
 
         let (rx, mut tx) = mpsc::channel(2);
-        
+
         let pr = ProblemRequest {
             spec: req
                 .spec
-                .ok_or(Status::invalid_argument("No spec provided"))?,
+                .ok_or_else(|| Status::invalid_argument("No spec provided"))?,
             completion_callback: rx.clone(),
             token: problem_token,
         };
-        
 
         self.proc.send(pr).expect(" send err ");
-        
+
         if let Some(out) = tx.recv().await {
-            println!("Replying to client with {:?}",out);
+            println!("Replying to client with {:?}", out);
             Ok(Response::new(OneShotResponse {
                 elapsed_realtime_ms: 0,
                 outcome: Some(match out {
                     Ok(value) => one_shot_response::Outcome::Solution(HaystackSolution { value }),
-                    Err(msg) => one_shot_response::Outcome::Error("An error occurred".to_owned()),
+                    Err(_) => one_shot_response::Outcome::Error("An error occurred".to_owned()),
                 }),
             }))
         } else {
@@ -156,7 +152,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let token = CancellationToken::new();
 
-    let h_agg = tokio::spawn(aggregation_loop(
+    tokio::spawn(aggregation_loop(
         core_state.clone(),
         0,
         problem_receiver,
@@ -180,5 +176,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_service(FrontendServer::new(f_state))
         .serve(addr)
         .await?;
+
     Ok(())
 }

@@ -1,33 +1,14 @@
-// struct grammar {
-//     prod_counts: Vec<u64>,
-// }
 
-// fn decode(grammar: &grammar, mut encoded: u64) -> Vec<u64> {
-//     let n_prod = 5;
-//     let mut a: Vec<u64> = Vec::new();
-
-//     let mut rem;
-//     loop {
-//         (encoded, rem) = (encoded / n_prod, encoded % n_prod);
-//         a.push(rem);
-//         if encoded == 0 {
-//             break;
-//         }
-//     }
-
-//     a
-// }
+const N_PROD: u64 = 6;
 
 pub fn pretty_print(encoded: u64) -> String {
     let mut tokens:Vec<String> = Vec::new();
     
-    if let Ok(_) = pretty_print_inner(&mut(encoded.clone()), &mut tokens) {
+    if pretty_print_inner(&mut(encoded.clone()), &mut tokens).is_ok() {
         tokens.join(" ")
     } else {
         "<invalid>".to_owned()
     }
-    
-    
 }
 
 fn pretty_print_inner(encoded: &mut u64, tokens: &mut Vec<String>) -> Result<(),()> {
@@ -35,7 +16,7 @@ fn pretty_print_inner(encoded: &mut u64, tokens: &mut Vec<String>) -> Result<(),
         return Err(());
     }
     let rem: u64;
-    (*encoded, rem) = (*encoded / n_prod, *encoded % n_prod);
+    (*encoded, rem) = (*encoded / N_PROD, *encoded % N_PROD);
     
     match rem {
         0 => tokens.push("1".to_owned()),
@@ -66,14 +47,12 @@ fn pretty_print_inner(encoded: &mut u64, tokens: &mut Vec<String>) -> Result<(),
     Ok(())
 }
 
-
+// Evaluate this term as an integer expression.
 pub fn outer_eval(src_encoded: u64, x:i32, y:i32) -> Option<i32> {
-    let mut hot = src_encoded.clone();
-    
-    
+    let mut hot = src_encoded;
     
     if let Some(value) = recurse_intexp(&mut hot, x,y)  {
-        if(hot == 0) {
+        if hot == 0 {
             Some(value)
         } else {
             None
@@ -83,17 +62,14 @@ pub fn outer_eval(src_encoded: u64, x:i32, y:i32) -> Option<i32> {
     }
     
 }
-const n_prod: u64 = 6;
-pub fn recurse_intexp( encoded:  &mut u64, x: i32, y: i32) -> Option<i32> {
-    
-    
-    
+
+fn recurse_intexp( encoded:  &mut u64, x: i32, y: i32) -> Option<i32> {
     if *encoded == 0 {
         return None;
     }
     
     let rem: u64;
-    (*encoded, rem) = (*encoded / n_prod, *encoded % n_prod);
+    (*encoded, rem) = (*encoded / N_PROD, *encoded % N_PROD);
     
     match rem {
         0 => Some(1),
@@ -109,16 +85,3 @@ pub fn recurse_intexp( encoded:  &mut u64, x: i32, y: i32) -> Option<i32> {
         _ => None,
     }
 }
-
-/*
-3 1 2
-
-3*16 + 1*4 + 2*1 = 48+4+2 = 54
-
-54/4 = 13,2
-
-13/4 = 3,1
-
-3/4 = 0,3
-
-*/
