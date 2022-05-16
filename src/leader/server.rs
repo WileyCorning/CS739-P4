@@ -1,5 +1,6 @@
 extern crate sah_lib;
 
+use std::env;
 use std::pin::Pin;
 use std::sync::Arc;
 
@@ -120,29 +121,14 @@ impl Frontend for FrontendState {
     }
 }
 
-// #[tonic::async_trait]
-// impl Volunteering for MyHelper {
-//     async fn volunteer(&self,req: Request<Empty>,) -> Result<Response<Empty>,Status> {
-//         let addr = req.remote_addr();//.ok_or(Status::unknown("Unable to read address"))?;
-
-//         let g =DelegationClient::connect(addr);
-
-//         // let mut client = DelegationClient::connect(addr).await
-//         // .map_err(|transport_err| Status::aborted("Unable to connect delegation client"))?;
-//         // Ok(Response::new(Empty{}));
-
-//         // println!("Got request {:?}; delaying 10sec",req);
-//         // sleep(Duration::new(10,0)).await;
-
-//         // let res = the_implementor::HelloResponse{payload: format!("Heya {}!", req.into_inner().payload),};
-//         // Ok(Response::new(res))
-//         todo!()
-//     }
-// }
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args: Vec<String> = env::args().collect();
+
+    let fault_tol = args[1].parse::<usize>().unwrap();
+
     let addr = "[::1]:50051".parse()?;
+    println!("Running leader with F={} at address {:?}", fault_tol, addr);
 
     let core_state = Arc::new(RwLock::new(CoreState::new()));
 
@@ -154,7 +140,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tokio::spawn(aggregation_loop(
         core_state.clone(),
-        0,
+        fault_tol,
         problem_receiver,
         result_bus_receiver,
         token.clone(),

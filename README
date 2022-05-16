@@ -1,5 +1,3 @@
 The project consists of three Rust binaries with a set of shared library code.
 
-To demonstrate the code on your local machine, run `cargo run --bin [server|volunteer|client]`; you will need to run all three simultaneously to observe its behavior.
-
-At time of writing, I'm still working on my evaluation and testing, as well as the report document (Remzi suggested I could take a little extra time for this). If AFS is locked before I finish the report, I will submit it through Canvas. Apologies for the dlay on this. My slides cover the main ideas implemented in this system.
+To demonstrate the code on your local machine, run `cargo build` to build the executables, and then run `server 0`, `volunteer`, and `client` in separate terminals to exercise the system. To demonstrate the consensus mechanism, run `server 1` to set a fault tolerance of 1, and then at least two volunteers. You can run additional volunteers in slow / malicious mode (`volunteer slow` and `volunteer malicious`) to see the effect of these kinds of issues.

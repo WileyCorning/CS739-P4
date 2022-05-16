@@ -62,10 +62,16 @@ impl<TOutput:PartialEq+Clone> ConsensusBuilder<TOutput> {
             // let (best, freq) = counted.most_common().into_iter().nth(0).unwrap();
             
             if freq > self.fault_tol {
+                println!("[{batch_id} with {current_size}] Consensus!");
+                
                 Ok(Some(values[idx].clone()))
             } else if current_size >= quorum_size {
+                println!("[{batch_id} with {current_size}] Error!");
+                
                 Err(anyhow!("Received 2F+1 outputs with no majority consensus (have {}, F={}, best is {})",current_size, self.fault_tol,freq))
             } else {
+                println!("[{batch_id} with {current_size}] No consensus");
+                
                 Ok(None)
             }
         }
@@ -94,7 +100,7 @@ impl CommitMask {
     
     fn is_available(&self, t: usize) -> bool {
         t >= self.commit_head &&
-        match self.commits.get(t) { Some(v) => *v, None => true } &&
+        match self.commits.get(t) { Some(v) => !(*v), None => true } &&
         match self.attempts.get(t) { Some(n) => *n < self.max_attempts, None => true }
     }
     
@@ -182,10 +188,15 @@ impl<T:ProblemDomain> ProblemState<T> {
         let t = batch_id.try_into().unwrap();
         
         if self.commit_mask.is_committed(t) {
+            println!("Discard _.{} from {} (stale batch)", batch_id,worker_id);
+            
             return None;
         }
         
+        println!("Accept _.{} from {}", batch_id,worker_id);
+        
         if !self.consensus_builder.register(batch_id, worker_id, value) {
+            
             return None;
         }
     
@@ -231,13 +242,20 @@ impl<T:ProblemDomain> CoreState<T> {
             
             let gen = &problem_data.gen;
             
+            
             // Find the next batch that this worker can work on
             let batch_id = {
                 let mut t = commit_head;
                 loop {
-                    
-                    if commit_mask.is_available(t) && filter((*problem_id, t.try_into().unwrap())) {
-                        break t;
+                    print!("{}", t);
+                    if commit_mask.is_available(t) {
+                        if filter((*problem_id, t.try_into().unwrap())) {
+                            break t;
+                        } else {
+                            print!("f ");
+                        }
+                    } else {
+                        print!("! ");
                     }
                     t +=1;
                 }
@@ -245,6 +263,7 @@ impl<T:ProblemDomain> CoreState<T> {
             .try_into()
             .unwrap();
             
+            println!("\n      Starting from {}, found at {}",commit_head,batch_id);
             
             if let Some(batch) = gen.try_make(batch_id) {
                 return Some((*problem_id,batch_id,batch));
@@ -324,11 +343,14 @@ pub async fn aggregation_loop <T:ProblemDomain> (
                 
                 // If this yields a conclusion, complete the relevant request
                 if let Some(conclusion) = problem_state.put_value(batch_id,worker_id,value) {
+                    
                     if (problem_state.request.completion_callback.send(conclusion).await).is_err() {
                         println!("Unable to send completion for problem {problem_id}");
                     }
                     access.forget(problem_id);
-                };
+                }
+            } else {
+                println!("Discard {}.{} from {} (stale problem)", problem_id,batch_id,worker_id);
             }
             
             continue;
